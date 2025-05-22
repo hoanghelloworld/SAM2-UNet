@@ -73,8 +73,8 @@ class FullDataset(Dataset):
         if mode == 'train':
             self.transform = transforms.Compose([
                 Resize((size, size)),
-                RandomHorizontalFlip(p=0.5),
-                RandomVerticalFlip(p=0.5),
+                # RandomHorizontalFlip(p=0.5),
+                # RandomVerticalFlip(p=0.5),
                 ToTensor(),
                 Normalize()
             ])
@@ -107,11 +107,9 @@ class FullDataset(Dataset):
         
 
 class TestDataset:
-    def __init__(self, image_root, gt_root, size):
+    def __init__(self, image_root, size, gt_root=""):
         self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.png')]
         self.images = sorted(self.images)
-        self.gts = sorted(self.gts)
         self.transform = transforms.Compose([
             transforms.Resize((size, size)),
             transforms.ToTensor(),
@@ -121,15 +119,31 @@ class TestDataset:
         self.gt_transform = transforms.ToTensor()
         self.size = len(self.images)
         self.index = 0
+        
+        # Only set up ground truth if gt_root is provided
+        if gt_root:
+            self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.png')]
+            self.gts = sorted(self.gts)
+            self.has_gt = True
+        else:
+            self.gts = [None] * self.size  # Placeholder for when no gt is available
+            self.has_gt = False
 
     def load_data(self):
         image = self.rgb_loader(self.images[self.index])
         image = self.transform(image).unsqueeze(0)
 
-        gt = self.binary_loader(self.gts[self.index])
-        gt = np.array(gt)
+        # Load ground truth if available, otherwise return empty array
+        if self.has_gt:
+            gt = self.binary_loader(self.gts[self.index])
+            gt = np.array(gt)
+        else:
+            # Return empty numpy array with correct shape
+            gt = np.zeros((image.shape[2], image.shape[3]), dtype=np.uint8)
 
         name = self.images[self.index].split('/')[-1]
+        if "\\" in name:  # Handle Windows paths
+            name = name.split('\\')[-1]
 
         self.index += 1
         return image, gt, name
